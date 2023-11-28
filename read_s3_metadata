@@ -1,7 +1,3 @@
-# List objects in the S3 bucket with the specified prefix
-objects = s3.list_objects_v2(Bucket=source_bucket, Prefix=source_prefix)
-
-# Check if there are contents in the S3 bucket
 if 'Contents' in objects:
     # Initialize lists to store metadata information
     source_paths = []
@@ -14,8 +10,10 @@ if 'Contents' in objects:
         source_path = obj['Key']
         filename = source_path.rsplit('/', 1)[-1]
         last_modified = obj['LastModified']
-        last_modified_str = last_modified.strftime("%Y-%m-%d %H:%M:%S")
         size = obj['Size']
+
+        # Convert datetime to string
+        last_modified_str = last_modified.strftime("%Y-%m-%d %H:%M:%S")
 
         # Append metadata information to lists
         source_paths.append(source_path)
@@ -30,4 +28,22 @@ if 'Contents' in objects:
         'LastModified': last_modified_dates,
         'Size': sizes
     })
-    spark_df = spark.createDataFrame(metadata_df)
+
+    # Define the schema for the PySpark DataFrame
+    schema = StructType([
+        StructField("SourcePath", StringType(), True),
+        StructField("Filename", StringType(), True),
+        StructField("LastModified", TimestampType(), True),
+        StructField("Size", StringType(), True)  # Change StringType to the appropriate type if 'Size' is not a string
+    ])
+
+    # Convert Pandas DataFrame to PySpark DataFrame
+    spark_df = spark.createDataFrame(metadata_df, schema=schema)
+
+    # Convert the timestamp column from string to PySpark timestamp
+    spark_df = spark_df.withColumn("LastModified", from_unixtime(unix_timestamp("LastModified", "yyyy-MM-dd HH:mm:ss")))
+
+    # Display the PySpark DataFrame
+    spark_df.show()
+else:
+    print("No contents found in the specified S3 bucket and prefix.")
