@@ -1,0 +1,32 @@
+# List objects in the S3 bucket with the specified prefix
+objects = s3.list_objects_v2(Bucket=source_bucket, Prefix=source_prefix)
+
+# Check if there are contents in the S3 bucket
+if 'Contents' in objects:
+    # Initialize lists to store metadata information
+    source_paths = []
+    filenames = []
+    last_modified_dates = []
+    sizes = []
+
+    for obj in objects.get('Contents', []):
+        # Extract metadata information
+        source_path = obj['Key']
+        filename = source_path.rsplit('/', 1)[-1]
+        last_modified = obj['LastModified']
+        size = obj['Size']
+
+        # Append metadata information to lists
+        source_paths.append(source_path)
+        filenames.append(filename)
+        last_modified_dates.append(last_modified)
+        sizes.append(size)
+
+    # Create a Pandas DataFrame with the metadata
+    metadata_df = pd.DataFrame({
+        'SourcePath': source_paths,
+        'Filename': filenames,
+        'LastModified': last_modified_dates,
+        'Size': sizes
+    })
+    spark_df = spark.createDataFrame(metadata_df)
