@@ -1,0 +1,39 @@
+ shdjs
+[@claimphone]
+(claim a phone)
+(claim phone)
+(claim my phone)
+(claim a phone line)
+(claim phone line)
+(claim a desk phone)
+(claim a telephone)
+(claim cisco phone)
+(claim a cisco phone)
+(claim phone still pending)
+(claim a phone order)
+(claim a phone guide)
+(claim a phone direction)
+(claim phone not working)
+(pending claim a phone)
+(unable to claim a phone)
+(can't claim a phone)
+(need to claim a phone)
+(how to claim a phone)
+(how do i claim a phone)
+(help me claim a phone)
+(request to claim a phone)
+(claim a phone in my new office)
+(claim a phone at my desk)
+(claim a phone in my new fc)
+;   
+
+# Common flexible patterns
+([@claimphone] $ANY_ALL [@cisco])        # e.g. “claim softphone cisco”
+(claim $ANY_ALL phone)                   # e.g. “claim another phone”
+(claim a phone $ANY_ALL)                 # e.g. “claim a phone today”
+(claim $ANY_ALL phone line)              # e.g. “claim second phone line”
+(claim $ANY_ALL [@cisco] phone)          # e.g. “claim IP cisco phone”
+(unable to claim $ANY_ALL phone)         # e.g. “unable to claim new phone”
+(how to claim $ANY_ALL phone)            # e.g. “how to claim replacement phone”
+(request to claim $ANY_ALL phone)        # e.g. “request to claim mobile phone”
+;
