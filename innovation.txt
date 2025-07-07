@@ -1,0 +1,125 @@
+ innovation sprint 
+
+The project is an innovation sprint initiative focused on identifying, analyzing, and visualizing escalation patterns occurring in conversations handled by the Amelia chatbot platform. It specifically targets conversations escalating to human agents due to chatbot automation breakdowns. The ultimate goal is to:
+	•	Pinpoint exactly where automation fails within chatbot workflows.
+	•	Create a clear visualization (heatmap dashboard) to quickly highlight problematic intents, tasks, or flows.
+	•	Provide actionable insights to Business Analysts (BAs), Product Owners, and developers to enhance chatbot automation, reduce human escalation, and improve user experience.
+
+⸻
+
+🔴 Current Problem Statement:
+	•	Manual Export: Currently, the data extraction process from Amelia is manual, involving selecting domains, date ranges, formats, and downloading CSV files. This is slow and inefficient.
+	•	Limited Transcript Access: Partial transcripts restrict the ability to fully understand conversations.
+	•	Slow Analytics Process: Creating visual analytics (e.g., Tableau) currently involves a time-consuming approval process with the RAT team, impractical for an innovation sprint.
+
+⸻
+
+🛠️ Proposed Technical Solution:
+
+Your solution involves automating data extraction, analysis, and visualization:
+
+1. Automated Data Extraction from Amelia:
+	•	Utilize the Amelia /conversations/export API to programmatically extract conversations.
+	•	Key data points extracted:
+	•	Conversation ID
+	•	Domain
+	•	Created and End Timestamps
+	•	Escalation Flags (True/False)
+	•	Escalation Queue & Reason
+	•	Executed Business Process Nodes (BPNs): Particularly capturing the ones before escalation (e.g., pre-escalate, pre-close).
+	•	Triggered Intent
+	•	Complete conversation transcripts, including the bot-user exchange before escalation.
+
+2. Data Storage (AWS S3):
+	•	Store extracted Amelia data as structured JSON or CSV files in AWS S3 buckets.
+	•	The Enterprise Computing Services (ECS) team pulls and processes these S3 data files into Splunk.
+
+3. Splunk Integration & Enhanced Metrics:
+	•	Extend current Splunk dashboards (already monitoring timeout escalations) to capture additional escalation metrics.
+	•	Enhanced Splunk queries include capturing:
+	•	Triggered intents leading to escalation.
+	•	Executed Business Process Nodes (BPNs).
+	•	User utterances (final messages before escalation).
+	•	Gabe and ECS team provide support for Splunk query enhancements.
+
+4. Dashboard & Heatmap Creation:
+	•	Build a Splunk dashboard prototype (fast, accessible internally, no RAT approval delays):
+	•	A heatmap visualizing escalation frequency/percentage.
+	•	X-axis: Top problematic chatbot intents.
+	•	Y-axis: Time periods (days/weeks) or different business queues/domains.
+	•	Cell shading: Represents the percentage of escalations attributed to each intent/time segment.
+	•	Clicking a cell displays deeper details:
+	•	Conversation IDs, executed BPN, and the user’s last utterance.
+
+5. Future Integration with Tableau:
+	•	After the successful innovation sprint demo, formal approval (intake) will be submitted to RAT team for creating a permanent, comprehensive Tableau dashboard for broader organizational use.
+
+⸻
+
+📌 Data Points Explained (Detailed):
+	•	Conversation ID: Unique identifier for every Amelia conversation.
+	•	Domain: Area or environment where conversation took place.
+	•	Escalation Flag: Indicates if chatbot escalated the conversation.
+	•	Escalation Queue & Reason: Shows to which human-agent queue the conversation was escalated, and why.
+	•	Executed BPN (Business Process Nodes): Amelia’s internal process steps executed before escalation.
+	•	Triggered Intent: The chatbot intent or scenario that caused the escalation.
+	•	User Utterances: User’s messages before escalation, helping to determine conversation context.
+	•	Session Mode: Identifies the exact moment Amelia chatbot handed off conversation to a human agent.
+
+⸻
+
+📊 Visualization (Heatmap Dashboard):
+
+Purpose:
+	•	Quickly identify chatbot intents frequently failing and causing escalation.
+	•	Enable fast troubleshooting and prioritization of automation improvements.
+
+
+Sprint Timeline & Immediate Tasks:
+
+Short-term tasks (POC phase):
+	•	Slide Deck Preparation (You/Natalia):
+	•	Draft abstract, project motivation, data flow architecture.
+	•	Automated Data Export Script (You/Gabe):
+	•	Python-based automation calling Amelia API and storing data in S3.
+	•	Splunk Access (Gabe requested):
+	•	Review existing Splunk dashboards.
+	•	Extend and build new queries for capturing escalation metrics.
+	•	Dashboard Prototype (Splunk):
+	•	Initial heatmap visualization prototype within Splunk.
+	•	Slide Deck Merge & Review (Natalia/You):
+	•	Prepare final 5-6 slide deck, merging your part with Natalia’s.
+
+Scheduled Meetings:
+	•	Monday Review Call (you, Natalia, Alyssa, Mark)
+	•	Present and refine merged slide deck.
+	•	Splunk Dashboard Walkthrough (once access granted)
+	•	Gabe leads; detailed session on existing dashboards and queries.
+
+⸻
+
+🚧 Considerations (Data Environment):
+	•	Development Data (Initial Testing):
+Initially use dev environment for testing and validating scripts, queries, and dashboards.
+	•	Production Data (Final):
+Once validated, get approvals to transition the setup into production for accurate analytics.
+
+⸻
+
+🚩 Key Outcomes & Benefits:
+	•	Rapid identification of chatbot pain-points, significantly reducing manual troubleshooting.
+	•	Improved user satisfaction by minimizing unnecessary escalations.
+	•	Operational efficiency through targeted fixes (reduce agent workload).
+	•	Data-driven insights supporting future chatbot enhancements and business decisions.
+
+⸻
+
+🎯 Next Immediate Steps for You:
+	•	Finalize 2-3 initial slides covering abstract, motivation, and solution overview.
+	•	Await Splunk dashboard access; attend scheduled walkthrough.
+	•	Collaborate closely with Gabe and Natalia to build PoC scripts and visualization.
+	•	Prepare for the Monday call with the comprehensive slide deck and PoC results.
+
+⸻
+
+This detailed breakdown covers the entire project’s objectives, components, processes, and next steps, providing clarity and alignment for successful project execution. Let me know if any more clarification or adjustments are needed!
