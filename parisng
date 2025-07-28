@@ -1,0 +1,42 @@
+
+
+
+
+Here’s a concise write-up you can post back to Elisa.
+
+⸻
+
+Key takeaways (Parsing settings)
+	•	Biggest drivers:
+	1.	Segment length and 2) overlap move the F1 the most.
+	2.	Segment titles and 4) Filter unnecessary segments have smaller, interaction-dependent effects.
+	•	Score ranges by length:
+	•	1000: 0.805–0.835
+	•	1300: 0.789–0.835 (the only sub-0.8 result occurs here)
+	•	1600: 0.805–0.850
+	•	2000: 0.805–0.850
+	•	Best observed F1: 0.850 with multiple 1600/2000 combinations when Segment Titles = N.
+Examples:
+	•	1600, overlap 100, Titles=N, Filter=Y → 0.850
+	•	1600, overlap 200, Titles=N, Filter=Y/N → 0.850
+	•	2000, overlap 100, Titles=N, Filter=Y/N → 0.850
+	•	Worst observed F1: 0.789 at 1300, overlap 300, Titles=N, Filter=N. Other weak spots:
+	•	2000, overlap 200, Titles=Y, Filter=Y → 0.805
+	•	1000, overlap 200/300, Titles=Y, Filter=N → 0.805
+
+Quantitative patterns
+	•	Longer segments generally help. Moving from 1000 → 1600/2000 raises the top of the range from 0.835 → 0.850.
+	•	Lower overlap is safer. Overlap = 100 delivers the most 0.85 results; 300 sometimes degrades (e.g., 1300/300 → 0.789–0.835).
+	•	Segment titles: Setting Titles = N tends to improve F1 at longer lengths (1600/2000). With Titles = Y we see several dips to 0.805.
+	•	Filtering unnecessary segments: Mixed effect; interacts with the other flags.
+	•	Helps at 1600, 100, Titles=N (0.835 → 0.850).
+	•	Hurts when Titles=Y and overlap ≥200 (e.g., 2000, 200, Y, Y → 0.805 vs Y, N → 0.821).
+	•	Neutral for 2000, 100, Titles=N (both 0.850).
+
+Recommendation
+	•	Primary configuration for quality: Segment length 1600, overlap 100, Titles = N, Filter = Y → F1 = 0.850.
+This gives the best score we saw and is robust across nearby settings.
+	•	Alternative (also 0.850): 1600, overlap 200, Titles = N, Filter = Y or N, or 2000, overlap 100, Titles = N, Filter = Y/N.
+	•	Avoid: 1300 with overlap 300 (risk of 0.789) and 2000 with overlap 200 when Titles=Y & Filter=Y (0.805).
+
+I can share the sheet and a quick plot if you’d like to see the distributions by factor.
