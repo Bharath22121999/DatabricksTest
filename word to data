@@ -1,0 +1,268 @@
+import argparse
+import os
+import sys
+import mimetypes
+from urllib.parse import urlparse
+from datetime import datetime
+import requests
+from bs4 import BeautifulSoup, Comment
+import pandas as pd
+from docx import Document
+from docx.shared import Inches, Pt
+from docx.oxml.ns import qn
+
+def read_urls(path):
+    path = os.path.abspath(path)
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Input file not found: {path}")
+    urls = []
+    _, ext = os.path.splitext(path.lower())
+    if ext == ".csv":
+        df = pd.read_csv(path)
+        if "url" in df.columns:
+            urls = [str(u).strip() for u in df["url"].tolist() if pd.notna(u)]
+        else:
+            # Fallback: take first column
+            first_col = df.columns[0]
+            urls = [str(u).strip() for u in df[first_col].tolist() if pd.notna(u)]
+    else:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                s = line.strip()
+                if not s or s.startswith("#"):
+                    continue
+                urls.append(s)
+    # Basic sanity
+    valid = []
+    for u in urls:
+        if not u.lower().startswith(("http://", "https://")):
+            u = "http://" + u  # be lenient
+        valid.append(u)
+    # De-duplicate while preserving order
+    seen = set()
+    out = []
+    for u in valid:
+        if u not in seen:
+            out.append(u)
+            seen.add(u)
+    return out
+
+def clean_html_to_text(html):
+    soup = BeautifulSoup(html, "lxml")
+
+    # Remove scripts, styles, head, comments, and obvious boilerplate
+    for tag in soup(["script", "style", "noscript", "header", "footer", "nav", "aside"]):
+        tag.decompose()
+
+    for c in soup.find_all(string=lambda text: isinstance(text, Comment)):
+        c.extract()
+
+    # Try to focus on main content if <main> exists
+    main = soup.find("main")
+    body = main if main else soup.body if soup.body else soup
+
+    # Title
+    title = ""
+    if soup.title and soup.title.string:
+        title = soup.title.string.strip()
+    elif (h1 := soup.find("h1")) and h1.get_text(strip=True):
+        title = h1.get_text(strip=True)
+
+    # Consolidate text
+    text = body.get_text("\n", strip=True)
+    # Collapse excessive blank lines
+    lines = [ln.strip() for ln in text.splitlines()]
+    # remove runs of empty lines
+    cleaned = []
+    prev_blank = False
+    for ln in lines:
+        blank = (ln == "")
+        if blank and prev_blank:
+            continue
+        cleaned.append(ln)
+        prev_blank = blank
+    text_out = "\n".join(cleaned).strip()
+
+    return title, text_out
+
+def extract_tables(html, max_tables=10, max_rows=200, max_cols=30):
+    try:
+        dfs = pd.read_html(html)  # uses lxml, can find many tables
+    except Exception:
+        return []
+
+    trimmed = []
+    for i, df in enumerate(dfs[:max_tables]):
+        # limit very large tables (to keep Word snappy)
+        df = df.iloc[:max_rows, :max_cols]
+        # Coerce to strings to avoid weird types
+        df = df.astype(str)
+        trimmed.append(df)
+    return trimmed
+
+def add_table_to_docx(doc: Document, df: pd.DataFrame):
+    rows, cols = df.shape
+    table = doc.add_table(rows=rows + 1, cols=cols)
+    table.style = 'Table Grid'
+
+    # header
+    for j, col in enumerate(df.columns):
+        cell = table.cell(0, j)
+        cell.text = str(col)
+
+    # body
+    for i in range(rows):
+        for j in range(cols):
+            table.cell(i + 1, j).text = str(df.iat[i, j])
+
+def is_html_response(resp: requests.Response):
+    ctype = resp.headers.get("Content-Type", "").lower()
+    return "text/html" in ctype or "application/xhtml" in ctype or ctype.startswith("text/")
+
+def hostname(u: str):
+    try:
+        return urlparse(u).hostname or u
+    except Exception:
+        return u
+
+def main():
+    parser = argparse.ArgumentParser(description="Fetch webpages and save text/tables to a Word document.")
+    parser.add_argument("--input", "-i", required=True, help="Path to txt (one URL per line) or CSV (with 'url' column).")
+    parser.add_argument("--output", "-o", default="output.docx", help="Output Word file path (default: output.docx).")
+    parser.add_argument("--timeout", "-t", type=int, default=30, help="Request timeout seconds (default: 30).")
+    parser.add_argument("--proxy", default=None, help="Proxy URL (e.g., http://user:pass@host:port). If omitted, uses env vars HTTP_PROXY/HTTPS_PROXY if present.")
+    parser.add_argument("--cafile", default=None, help="Path to corporate CA bundle (PEM).")
+    parser.add_argument("--insecure", action="store_true", help="Skip TLS verification (NOT recommended).")
+    parser.add_argument("--max_images", type=int, default=0, help="(Optional) Maximum number of images to embed per page (default: 0 = skip images).")
+    args = parser.parse_args()
+
+    urls = read_urls(args.input)
+    if not urls:
+        print("No URLs found in the input file.")
+        sys.exit(1)
+
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    })
+
+    # Proxies
+    if args.proxy:
+        session.proxies.update({"http": args.proxy, "https": args.proxy})
+
+    # TLS verification
+    verify = True
+    if args.cafile:
+        verify = args.cafile
+    if args.insecure:
+        verify = False
+
+    doc = Document()
+    # Basic doc defaults
+    styles = doc.styles
+    if "Normal" in styles:
+        styles["Normal"].font.name = "Calibri"
+        styles["Normal"]._element.rPr.rFonts.set(qn('w:eastAsia'), "Calibri")
+        styles["Normal"].font.size = Pt(11)
+
+    doc.add_heading("Web Capture Export", level=0)
+    doc.add_paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    doc.add_paragraph(f"Total URLs: {len(urls)}")
+    doc.add_paragraph("Note: Layout is not preserved; this export captures text and tables only.")
+
+    for idx, url in enumerate(urls, start=1):
+        doc.add_page_break()
+        doc.add_heading(f"{idx}. {url}", level=1)
+        doc.add_paragraph(f"Host: {hostname(url)}")
+        doc.add_paragraph(f"Retrieved: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+        try:
+            resp = session.get(url, timeout=args.timeout, verify=verify, allow_redirects=True)
+        except requests.exceptions.SSLError as e:
+            doc.add_paragraph(f"SSL error fetching {url}: {e}")
+            continue
+        except Exception as e:
+            doc.add_paragraph(f"Error fetching {url}: {e}")
+            continue
+
+        status = resp.status_code
+        doc.add_paragraph(f"HTTP status: {status}")
+        if not (200 <= status < 300):
+            doc.add_paragraph("Skipping (non-OK response).")
+            continue
+
+        if not is_html_response(resp):
+            ctype = resp.headers.get("Content-Type", "unknown")
+            doc.add_paragraph(f"Non-HTML content type ({ctype}). Not parsed. Link recorded above.")
+            continue
+
+        html = resp.text
+
+        # Title + Text
+        title, body_text = clean_html_to_text(html)
+        if title:
+            doc.add_heading(title, level=2)
+
+        if body_text:
+            doc.add_heading("Page Text", level=3)
+            # Add in chunks to keep Word responsive
+            chunks = body_text.split("\n")
+            batch = []
+            char_count = 0
+            for line in chunks:
+                batch.append(line)
+                char_count += len(line) + 1
+                if char_count > 4000:
+                    doc.add_paragraph("\n".join(batch))
+                    batch = []
+                    char_count = 0
+            if batch:
+                doc.add_paragraph("\n".join(batch))
+        else:
+            doc.add_paragraph("No text content detected.")
+
+        # Tables
+        tables = extract_tables(html)
+        if tables:
+            doc.add_heading("Detected Tables", level=3)
+            for ti, df in enumerate(tables, start=1):
+                doc.add_paragraph(f"Table {ti} ({df.shape[0]} rows × {df.shape[1]} cols)")
+                add_table_to_docx(doc, df)
+
+        # Optional: a few images (kept off by default in banks for doc size)
+        if args.max_images > 0:
+            try:
+                soup = BeautifulSoup(html, "lxml")
+                imgs = soup.find_all("img")
+                added = 0
+                for img in imgs:
+                    if added >= args.max_images:
+                        break
+                    src = img.get("src")
+                    if not src:
+                        continue
+                    # Resolve relative sources
+                    try:
+                        from urllib.parse import urljoin
+                        img_url = urljoin(resp.url, src)
+                        ir = session.get(img_url, timeout=10, verify=verify)
+                        if ir.status_code == 200 and ir.headers.get("Content-Type", "").lower().startswith(("image/",)):
+                            # python-docx accepts file-like
+                            from io import BytesIO
+                            bio = BytesIO(ir.content)
+                            doc.add_picture(bio, width=Inches(5.5))
+                            added += 1
+                    except Exception:
+                        continue
+                if added:
+                    doc.add_paragraph(f"Embedded {added} image(s).")
+            except Exception:
+                pass
+
+    out_path = os.path.abspath(args.output)
+    doc.save(out_path)
+    print(f"Saved: {out_path}")
+
+if __name__ == "__main__":
+    main()
