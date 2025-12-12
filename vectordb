@@ -1,0 +1,47 @@
+from sentence_transformers import SentenceTransformer, util
+import torch
+
+# 1. Load a pre-trained model
+# 'all-MiniLM-L6-v2' is fast and accurate for semantic similarity
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# 2. Your Dataset (Imagine this is your list of 20,000 sentences)
+dataset = [
+    "The stock market crashed today.",
+    "I need to buy some fresh fruit.",
+    "The financial markets took a huge hit.", # Similar to sentence 1
+    "Can you help me locate the apples?",      # Similar to sentence 2
+    "Data science is a growing field.",
+    # ... imagine 20,000 more sentences here
+]
+
+# 3. Your Input (The utterance you want to match)
+input_utterance = "I want to purchase some apples."
+
+# 4. Convert (Encode) the dataset and the input into Vectors
+# This might take a few seconds for 20k sentences
+dataset_embeddings = model.encode(dataset, convert_to_tensor=True)
+input_embedding = model.encode(input_utterance, convert_to_tensor=True)
+
+# 5. Compute Cosine Similarity
+cosine_scores = util.cos_sim(input_embedding, dataset_embeddings)[0]
+
+# 6. Filter and Print Results
+# We use a threshold (e.g., 0.6). Only show sentences with > 60% similarity.
+threshold = 0.6
+
+print(f"Input: {input_utterance}\n")
+print("Similar sentences found in dataset:")
+
+# Combine sentences with their scores
+results = []
+for i in range(len(dataset)):
+    score = cosine_scores[i].item()
+    if score > threshold:
+        results.append((score, dataset[i]))
+
+# Sort by highest score first
+results = sorted(results, key=lambda x: x[0], reverse=True)
+
+for score, sentence in results:
+    print(f"Score: {score:.4f} | Sentence: {sentence}")
